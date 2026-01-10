@@ -22,7 +22,7 @@ st.title("🌤️ Pogoda dla Śląska")
 st.subheader("Analiza Gemini 2.5 Flash")
 
 # Pole na klucz API (możesz wpisać na stałe lub podawać w apce)
-api_key = st.text_input("Wprowadź swój Gemini API Key:", type="password")
+api_key = st.secrets["GEMINI_API_KEY"]
 
 if st.button("POBIERZ AKTUALNĄ PROGNOZĘ"):
     if not api_key:
@@ -59,4 +59,5 @@ if st.button("POBIERZ AKTUALNĄ PROGNOZĘ"):
                 st.error(f"Wystąpił błąd: {e}")
 
 st.divider()
+
 st.caption("Źródło danych: pogodadlaslaska.pl")
