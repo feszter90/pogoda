@@ -32,6 +32,7 @@ def fetch_data():
         
         prompt = (
             f"Jesteś Śląskim Bardem. Zanalizuj dane i odpowiedz PO ŚLĄSKU.\n"
+            f"Pisz tak, żeby gorole też zrozumieli.\n"
             f"DANE: \n{tekst_strony}\n\n"
             f"FORMAT ODPOWIEDZI (DOKŁADNIE TAKI):\n"
             f"TEMP: [sama liczba stopni]\n"
@@ -115,3 +116,4 @@ else:
     st.info("Pobieranie danych...")
     fetch_data()
     st.rerun()
+
