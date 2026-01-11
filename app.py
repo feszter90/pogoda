@@ -34,6 +34,7 @@ def fetch_data():
 
         client = genai.Client(api_key=api_key)
         prompt = (
+            "Pisz w stylu śląskiego barda"
             "Jesteś profesjonalnym pogodynką na Śląsku. Przeanalizuj dane: " + tekst_strony + "\n\n"
             "Zwróć odpowiedź DOKŁADNIE w tym formacie:\n"
             "Linia 1: temperatura,wiatr,jakość_powietrza (same wartości, np: 12,15,Dobra)\n"
@@ -149,4 +150,5 @@ else:
     st.info("Pobieram najnowszą prognozę...")
     fetch_data()
     st.rerun()
+
 
