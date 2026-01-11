@@ -61,7 +61,7 @@ if 'update_status' not in st.session_state:
     st.session_state['update_status'] = "idle"
 
 # Auto-odświeżanie co 1h
-st_autorefresh(interval=3600000, key="weather_refresh")
+# st_autorefresh(interval=3600000, key="weather_refresh")
 
 # --- INTERFEJS UŻYTKOWNIKA ---
 if st.session_state['last_forecast']:
@@ -132,4 +132,5 @@ else:
         if st.button("URUCHOM TERAZ"):
             fetch_data()
             st.rerun()
+
 
