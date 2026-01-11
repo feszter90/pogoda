@@ -30,18 +30,20 @@ def fetch_data():
 
         client = genai.Client(api_key=api_key)
         
-        # PROMPT: Śląski Bard Przystępny
+        # PROMPT: Śląski Bard - Wersja Przystępna (Lekki Akcent)
         prompt = (
             f"Analizuj dane pogodowe: \n{tekst_strony}\n\n"
-            f"Jesteś Śląskim Bardem. Mówisz z charakterystycznym śląskim akcentem i używasz śląskich zwrotów, "
-            f"ale robisz to tak, żeby każdy Polak Cię zrozumiał (używaj zrozumiałej gwary). \n"
+            f"Jesteś Śląskim Bardem, ale piszesz w sposób zrozumiały dla każdego Polaka. "
+            f"Używaj poprawnej polszczyzny z lekkim śląskim zabarwieniem (akcentem). "
+            f"Zamiast trudnych gwarowych słów, używaj tylko tych powszechnie znanych i sympatycznych. "
+            f"Nie przesadzaj z gwarą – ma być klimatycznie, ale czytelnie!\n"
             f"Odpowiedz DOKŁADNIE według tego wzoru:\n"
             f"TEMP_TERAZ: [sama liczba]\n"
             f"WIATR: [liczba]\n"
             f"LUFT: [ocena]\n"
-            f"RADA: [krótka rada z lekkim śląskim zacięciem]\n"
+            f"RADA: [krótka rada z lekkim śląskim humorem]\n"
             f"PROGNOZA_LISTA:\n"
-            f"[Ikona] [Pora]| [Temperatura]| [Opis po śląsku, ale zrozumiały]"
+            f"[Ikona] [Pora]| [Temperatura]| [Opis zrozumiały dla każdego]"
         )
         
         response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
@@ -61,7 +63,7 @@ st_autorefresh(interval=3600000, key="weather_refresh")
 if st.session_state['last_forecast']:
     raw_text = st.session_state['last_forecast']
     
-    # Wyciąganie danych (regex)
+    # Wyciąganie danych
     temp_match = re.search(r"TEMP_TERAZ:\s*([\d+-]+)", raw_text)
     wiatr_match = re.search(r"WIATR:\s*([\d+-]+)", raw_text)
     luft_match = re.search(r"LUFT:\s*(.*)", raw_text)
@@ -107,7 +109,7 @@ if st.session_state['last_forecast']:
     st.markdown(f"<div class='advice-card'>💡 {advice}</div>", unsafe_allow_html=True)
 
     if forecast_lines:
-        st.markdown("### 🗓️ Co nos czeko:")
+        st.markdown("### 🗓️ Co nas czeka:")
         for line in forecast_lines:
             parts = line.split('|')
             if len(parts) >= 3:
@@ -117,7 +119,7 @@ if st.session_state['last_forecast']:
                             <span style="font-size: 1.1em; font-weight: bold;">{parts[0].strip()}</span>
                             <span style="background: rgba(0,0,0,0.1); padding: 4px 15px; border-radius: 12px; font-weight: 900; font-size: 1.1em;">{parts[1].strip()}</span>
                         </div>
-                        <div style="margin-top: 8px; font-size: 1em; line-height: 1.4;">{parts[2].strip()}</div>
+                        <div style="margin-top: 8px; font-size: 1.05em; line-height: 1.4;">{parts[2].strip()}</div>
                     </div>
                 """, unsafe_allow_html=True)
 
@@ -128,6 +130,6 @@ if st.session_state['last_forecast']:
     st.caption(f"Aktualizacja: {st.session_state.get('last_update', '---')}")
 
 else:
-    st.info("Bard szuka mądrego słowa o pogodzie...")
+    st.info("Bard sprawdza co tam w pogodzie słychać...")
     fetch_data()
     st.rerun()
