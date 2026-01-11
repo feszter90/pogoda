@@ -119,7 +119,7 @@ if st.session_state['last_forecast']:
         """, unsafe_allow_html=True)
 
     # --- NAGŁÓWEK ---
-        st.title("🌤️ Śląsk AI Dashboard")
+        st.title("🌤️ POGODA ŚLĄSK ")
         
         # SEKCJA GŁÓWNA (Temperatura i ikona)
         col1, col2 = st.columns([1, 1])
@@ -158,4 +158,5 @@ else:
     st.info("Inicjalizacja systemu i pobieranie danych pogodowych...")
     fetch_data()
     st.rerun()
+
 
