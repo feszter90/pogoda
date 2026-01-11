@@ -29,28 +29,30 @@ def fetch_data():
         res = requests.get("https://pogodadlaslaska.pl/", timeout=15)
         res.raise_for_status()
         soup = BeautifulSoup(res.text, 'html.parser')
-        tekst_strony = soup.get_text(separator=' ', strip=True)[:8000]
+        
+        # Oszczędność 1: Bierzemy tylko pierwsze 4000 znaków zamiast 8000
+        tekst_strony = soup.get_text(separator=' ', strip=True)[:4000]
 
         client = genai.Client(api_key=api_key)
+        
+        # Oszczędność 2: Bardzo krótki, konkretny prompt (mniej tokenów)
         prompt = (
-            "Pisz w stylu śląskiego barda"
-            "Jesteś profesjonalnym pogodynką na Śląsku. Przeanalizuj dane: " + tekst_strony + "\n\n"
-            "Zwróć odpowiedź DOKŁADNIE w tym formacie:\n"
-            "Linia 1: temperatura,wiatr,jakość_powietrza (same wartości, np: 12,15,Dobra)\n"
-            "Linia 2: Jedna krótka, inteligentna rada życiowa na dziś (max 15 słów)\n"
-            "Reszta: Krótka prognoza w punktach z ikonami emoji. "
-            "WAŻNE: Dla każdego opisywanego okresu (np. rano, po południu, noc) "
-            "PODAJ KONKRETNY ZAKRES TEMPERATUR (np. 'od 2°C do 5°C'), unikaj sformułowań typu 'będzie mroźno' bez podania stopni."
+            "Na podstawie: " + tekst_strony + "\n"
+            "Odpowiedz krótko:\n"
+            "L1: temp_teraz,wiatr_kmh,jakosc_powietrza\n"
+            "L2: Porada (1 zdanie)\n"
+            "L3+: Prognoza: ikona, okres, zakres temp (np. ☀️ Rano: 2-5°C)"
         )
-        response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
+        
+        # Oszczędność 3: Używamy modelu 1.5-flash (często ma luźniejsze limity niż 2.5)
+        response = client.models.generate_content(model="gemini-1.5-flash", contents=prompt)
         
         st.session_state['last_forecast'] = response.text
         st.session_state['last_update'] = time.strftime("%H:%M:%S")
         st.session_state['update_status'] = "success"
-        st.session_state['next_allowed_attempt'] = 0 # Resetujemy blokadę po sukcesie
+        st.session_state['next_allowed_attempt'] = 0
     except Exception as e:
         st.session_state['update_status'] = "error"
-        # Ustawiamy blokadę czasową na 60 sekund od teraz
         st.session_state['next_allowed_attempt'] = time.time() + 60
         print(f"Błąd API: {e}")
         
@@ -61,7 +63,7 @@ if 'update_status' not in st.session_state:
     st.session_state['update_status'] = "idle"
 
 # Auto-odświeżanie co 1h
-st_autorefresh(interval=3600000, key="weather_refresh")
+# st_autorefresh(interval=3600000, key="weather_refresh")
 
 # --- INTERFEJS UŻYTKOWNIKA ---
 if st.session_state['last_forecast']:
@@ -132,6 +134,7 @@ else:
         if st.button("URUCHOM TERAZ"):
             fetch_data()
             st.rerun()
+
 
 
 
