@@ -119,6 +119,16 @@ if st.session_state['last_forecast']:
             st.rerun()
 else:
     st.title("🌤️ Śląsk AI")
-    st.info("Pobieram dane startowe...")
-    fetch_data()
-    st.rerun()
+    if st.session_state.get('update_status') == "error":
+        st.error("Limit zapytań wyczerpany (Błąd 429).")
+        st.info("Google Gemini potrzebuje chwili odpoczynku. Odczekaj minutę i spróbuj ponownie.")
+        if st.button("PONÓW PRÓBĘ"):
+            fetch_data()
+            st.rerun()
+     else:
+         st.info("Pobieram dane startowe...")
+         fetch_data()
+        # Małe opóźnienie, żeby nie spamować serwera
+         time.sleep(1) 
+          st.rerun()
+
