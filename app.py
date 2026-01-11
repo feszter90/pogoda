@@ -38,7 +38,9 @@ def fetch_data():
             "Zwróć odpowiedź DOKŁADNIE w tym formacie:\n"
             "Linia 1: temperatura,wiatr,jakość_powietrza (same wartości, np: 12,15,Dobra)\n"
             "Linia 2: Jedna krótka, inteligentna rada życiowa na dziś (max 15 słów)\n"
-            "Reszta: Krótka prognoza w punktach z ikonami emoji."
+            "Reszta: Krótka prognoza w punktach z ikonami emoji. "
+            "WAŻNE: Dla każdego opisywanego okresu (np. rano, po południu, noc) "
+            "PODAJ KONKRETNY ZAKRES TEMPERATUR (np. 'od 2°C do 5°C'), unikaj sformułowań typu 'będzie mroźno' bez podania stopni."
         )
         
         response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
@@ -147,3 +149,4 @@ else:
     st.info("Pobieram najnowszą prognozę...")
     fetch_data()
     st.rerun()
+
