@@ -19,17 +19,15 @@ def get_weather_theme(text):
         return "linear-gradient(180deg, #f8b500 0%, #fceabb 100%)", "☀️", "#212121"
     return "linear-gradient(180deg, #0f2027 0%, #2c5364 100%)", "🌤️", "white"
 
-# --- 2. POBIERANIE PRECYZYJNEJ TEMP ---
 def get_precise_temp():
     try:
-        # Lokalizacja: Rybnik/Śląsk
         url = "https://api.open-meteo.com/v1/forecast?latitude=50.0971&longitude=18.5417&current_weather=true"
         response = requests.get(url).json()
         return response['current_weather']['temperature']
     except:
         return None
 
-# --- 3. SILNIK AI ---
+# --- 2. SILNIK AI ---
 def fetch_data():
     try:
         api_key = st.secrets["GEMINI_API_KEY"]
@@ -42,17 +40,20 @@ def fetch_data():
 
         client = genai.Client(api_key=api_key)
         
-        # PROMPT: Teraz Bard wita w imieniu Kamila
         prompt = (
             f"Analizuj dane pogodowe: \n{tekst_strony}\n\n"
             f"Jesteś Śląskim Bardem w aplikacji Kamila. Mówisz zrozumiale po polsku z lekkim akcentem.\n"
             f"Aktualna temperatura to {precise_now}°C.\n"
-            f"Przygotuj prognozę na najbliższe dni (pełne dni, bez rozbicia na pory dnia).\n"
+            f"Przygotuj prognozę w dwóch częściach:\n"
+            f"1. SZCZEGÓŁY NA DZIŚ: rano, południe, wieczór, noc.\n"
+            f"2. KOLEJNE DNI: ogólnie na cały dzień.\n\n"
             f"Zwróć odpowiedź DOKŁADNIE według tego wzoru:\n"
             f"INFO: [wiatr km/h], [jakość powietrza]\n"
             f"RADA: [krótka rada z humorem dla Kamila]\n"
+            f"DZISIAJ:\n"
+            f"[Ikona] [Pora]| [Temp]| [Opis]\n"
             f"PROGNOZA_DNI:\n"
-            f"[Ikona] [Dzień tygodnia]| [Zakres temp]| [Opis zrozumiały dla każdego]"
+            f"[Ikona] [Dzień]| [Zakres]| [Opis]"
         )
         
         response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
@@ -63,7 +64,7 @@ def fetch_data():
     except Exception as e:
         st.error(f"Feler: {e}")
 
-# --- 4. INTERFEJS ---
+# --- 3. LOGIKA WYŚWIETLANIA ---
 if 'last_forecast' not in st.session_state:
     st.session_state['last_forecast'] = None
 
@@ -74,15 +75,21 @@ if st.session_state['last_forecast']:
     
     info_match = re.search(r"INFO:\s*(.*)", raw_text)
     rada_match = re.search(r"RADA:\s*(.*)", raw_text)
-    
     info_text = info_match.group(1).split('\n')[0] if info_match else "Brak danych"
     advice = rada_match.group(1).split('\n')[0] if rada_match else "Udanego dnia, Kamil!"
     clean_temp = st.session_state.get('current_temp', '??')
 
-    forecast_lines = []
-    if "PROGNOZA_DNI:" in raw_text:
-        list_part = raw_text.split("PROGNOZA_DNI:")[-1].strip()
-        forecast_lines = [l.strip() for l in list_part.split('\n') if "|" in l]
+    # Rozdzielanie sekcji "Dzisiaj" i "Kolejne dni"
+    today_lines = []
+    future_lines = []
+    
+    if "DZISIAJ:" in raw_text and "PROGNOZA_DNI:" in raw_text:
+        parts = raw_text.split("PROGNOZA_DNI:")
+        today_part = parts[0].split("DZISIAJ:")[-1].strip()
+        future_part = parts[1].strip()
+        
+        today_lines = [l.strip() for l in today_part.split('\n') if "|" in l]
+        future_lines = [l.strip() for l in future_part.split('\n') if "|" in l]
 
     bg_color, main_icon, font_color = get_weather_theme(raw_text)
 
@@ -91,14 +98,15 @@ if st.session_state['last_forecast']:
         .stApp {{ background: {bg_color}; background-attachment: fixed; }}
         h1, h2, h3, p, span, div {{ color: {font_color} !important; font-family: 'Segoe UI', sans-serif; }}
         .main-card {{ background: rgba(0,0,0,0.1); padding: 30px; border-radius: 30px; text-align: center; border: 1px solid rgba(255,255,255,0.1); }}
-        .advice-card {{ background: rgba(255, 255, 255, 0.2); padding: 15px; border-radius: 15px; margin: 20px 0; border-left: 5px solid orange; font-style: italic; }}
-        .forecast-card {{ background: rgba(255, 255, 255, 0.15); padding: 15px; border-radius: 20px; margin-bottom: 10px; backdrop-filter: blur(10px); }}
+        .advice-card {{ background: rgba(255, 255, 255, 0.2); padding: 15px; border-radius: 15px; margin: 20px 0; border-left: 5px solid orange; }}
+        .forecast-card {{ background: rgba(255, 255, 255, 0.15); padding: 12px; border-radius: 20px; margin-bottom: 8px; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.05); }}
+        .section-title {{ margin: 25px 0 10px 5px; font-weight: bold; font-size: 1.2em; opacity: 0.9; }}
         </style>
     """, unsafe_allow_html=True)
 
     st.title("⚒️ Pogoda u Kamila")
 
-    # Karta główna
+    # Główna temperatura
     st.markdown(f"""
         <div class="main-card">
             <div style="font-size: 80px; margin-bottom: 5px;">{main_icon}</div>
@@ -110,19 +118,35 @@ if st.session_state['last_forecast']:
 
     st.markdown(f"<div class='advice-card'>💡 {advice}</div>", unsafe_allow_html=True)
 
-    # Prognoza wielodniowa
-    if forecast_lines:
-        st.markdown("### 🗓️ Zapowiedź na kolejne dni:")
-        for line in forecast_lines:
+    # --- SEKCJA: DZISIAJ (Szczegóły) ---
+    if today_lines:
+        st.markdown("<div class='section-title'>🕒 Plan na dzisiaj:</div>", unsafe_allow_html=True)
+        for line in today_lines:
             parts = line.split('|')
             if len(parts) >= 3:
                 st.markdown(f"""
                     <div class="forecast-card">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <span style="font-weight: bold; font-size: 1.1em;">{parts[0].strip()}</span>
-                            <span style="background: rgba(0,0,0,0.1); padding: 3px 12px; border-radius: 10px; font-weight: 900;">{parts[1].strip()}</span>
+                            <span style="font-weight: bold;">{parts[0].strip()}</span>
+                            <span style="background: rgba(0,0,0,0.1); padding: 2px 10px; border-radius: 10px; font-weight: bold;">{parts[1].strip()}</span>
                         </div>
-                        <div style="margin-top: 5px; font-size: 0.95em; opacity: 0.9;">{parts[2].strip()}</div>
+                        <div style="margin-top: 5px; font-size: 0.9em;">{parts[2].strip()}</div>
+                    </div>
+                """, unsafe_allow_html=True)
+
+    # --- SEKCJA: KOLEJNE DNI ---
+    if future_lines:
+        st.markdown("<div class='section-title'>🗓️ Nadchodzące dni:</div>", unsafe_allow_html=True)
+        for line in future_lines:
+            parts = line.split('|')
+            if len(parts) >= 3:
+                st.markdown(f"""
+                    <div class="forecast-card" style="background: rgba(0,0,0,0.05);">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-weight: 500;">{parts[0].strip()}</span>
+                            <span style="font-weight: 900;">{parts[1].strip()}</span>
+                        </div>
+                        <div style="margin-top: 3px; font-size: 0.85em; opacity: 0.8;">{parts[2].strip()}</div>
                     </div>
                 """, unsafe_allow_html=True)
 
@@ -135,4 +159,3 @@ if st.session_state['last_forecast']:
 else:
     fetch_data()
     st.rerun()
-    
