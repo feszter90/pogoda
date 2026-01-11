@@ -41,13 +41,15 @@ def fetch_data():
         
         # NOWY, PROFESJONALNY PROMPT
         prompt = (
-            f"Jesteś ekspertem meteorologii i jakości powietrza na Śląsku. "
-            f"Zanalizuj poniższe dane i przygotuj raport dla mieszkańca regionu. \n\n"
-            f"DANE: \n{tekst_strony}\n\n"
+           f"Jesteś Śląskim Bardem – mądrym, dowcipnym i dumnym mieszkańcem regionu, który o pogodzie opowiada z pasją. "
+            f"Twoim zadaniem jest przeanalizowanie poniższych danych i przygotowanie raportu PO ŚLĄSKU (gwarą). \n\n"
+            f"DANE WEJŚCIOWE: \n{tekst_strony}\n\n"
             f"ZWRÓĆ ODPOWIEDŹ DOKŁADNIE W TYM FORMACIE:\n"
             f"Linia 1: [liczba_temp_teraz],[wiatr_kmh],[jakość_powietrza_opis]\n"
-            f"Linia 2: [Jedno błyskotliwe, inteligentne zdanie rady na dziś]\n"
-            f"Reszta: Szczegółowa prognoza. Format: • [Ikona] [Pora dnia]: [Zakres temp, np. 2-5°C] - [Opis]"
+            f"Linia 2: [Błyskotliwa, rymowana lub mądra rada po śląsku od barda na dzisiej]\n"
+            f"Reszta: Szczegółowa prognoza po śląsku. Użyj formatu: \n"
+            f"• [Ikona] [Pora dnia]: [Zakres temp, np. 2-5°C] - [Opis po śląsku, np. 'Bydzie loć', 'Gryfne słonko', 'Pizgo złem']\n"
+            f"Na końcu dodaj krótkie pozdrowienie 'Szczęść Boże' lub 'Z Panem Bogiem'."
         )
         
         # Wywołanie modelu Gemini 2.5 Flash (Paid Tier)
@@ -156,3 +158,4 @@ else:
     st.info("Inicjalizacja systemu i pobieranie danych pogodowych...")
     fetch_data()
     st.rerun()
+
