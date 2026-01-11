@@ -112,7 +112,7 @@ if st.session_state['last_forecast']:
         """, unsafe_allow_html=True)
 
         # NAGŁÓWEK
-        st.title("🌤️ Śląsk AI Dashboard")
+        st.title("🌤️ Pogoda dla Śląska")
         
         col1, col2 = st.columns([1, 1])
         with col1:
@@ -150,5 +150,6 @@ else:
     st.info("Pobieram najnowszą prognozę...")
     fetch_data()
     st.rerun()
+
 
 
