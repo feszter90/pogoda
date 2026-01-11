@@ -24,7 +24,6 @@ def get_weather_theme(text):
     return "linear-gradient(180deg, #0f2027 0%, #2c5364 100%)", "🌤️"
 
 def fetch_data():
-    """Próbuje pobrać dane. Jeśli wystąpi błąd (np. 429), zachowuje stare dane."""
     try:
         api_key = st.secrets["GEMINI_API_KEY"]
         res = requests.get("https://pogodadlaslaska.pl/", timeout=15)
@@ -34,7 +33,7 @@ def fetch_data():
 
         client = genai.Client(api_key=api_key)
         prompt = (
-           "Pisz w stylu śląskiego barda"
+            "Pisz w stylu śląskiego barda"
             "Jesteś profesjonalnym pogodynką na Śląsku. Przeanalizuj dane: " + tekst_strony + "\n\n"
             "Zwróć odpowiedź DOKŁADNIE w tym formacie:\n"
             "Linia 1: temperatura,wiatr,jakość_powietrza (same wartości, np: 12,15,Dobra)\n"
@@ -43,18 +42,18 @@ def fetch_data():
             "WAŻNE: Dla każdego opisywanego okresu (np. rano, po południu, noc) "
             "PODAJ KONKRETNY ZAKRES TEMPERATUR (np. 'od 2°C do 5°C'), unikaj sformułowań typu 'będzie mroźno' bez podania stopni."
         )
-        
         response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
         
-        # Sukces - aktualizujemy sesję
         st.session_state['last_forecast'] = response.text
         st.session_state['last_update'] = time.strftime("%H:%M:%S")
         st.session_state['update_status'] = "success"
+        st.session_state['next_allowed_attempt'] = 0 # Resetujemy blokadę po sukcesie
     except Exception as e:
-        # Błąd (np. limit API) - nie czyścimy 'last_forecast'
         st.session_state['update_status'] = "error"
+        # Ustawiamy blokadę czasową na 60 sekund od teraz
+        st.session_state['next_allowed_attempt'] = time.time() + 60
         print(f"Błąd API: {e}")
-
+        
 # --- INICJALIZACJA SESJI ---
 if 'last_forecast' not in st.session_state:
     st.session_state['last_forecast'] = None
@@ -118,19 +117,19 @@ if st.session_state['last_forecast']:
             fetch_data()
             st.rerun()
 else:
-    # SEKCJA STARTOWA - Zapobieganie pętli błędu 429
     st.title("🌤️ Śląsk AI")
     
-    if st.session_state.get('update_status') == "error":
-        st.error("Limit zapytań Gemini przekroczony (Błąd 429).")
-        st.write("Google potrzebuje minuty przerwy. Nie odświeżaj strony co sekundę.")
-        if st.button("SPRÓBUJ PONOWNIE"):
-            fetch_data()
-            st.rerun()
+    # Sprawdzamy, czy musimy jeszcze poczekać
+    wait_time = int(st.session_state.get('next_allowed_attempt', 0) - time.time())
+    
+    if wait_time > 0:
+        st.error(f"Limit Gemini wyczerpany. Spróbuj ponownie za {wait_time} sekund.")
+        st.info("Nie odświeżaj strony, licznik bije sam.")
+        time.sleep(1)
+        st.rerun()
     else:
         st.info("Pobieram dane startowe...")
-        fetch_data()
-        # Jeśli po fetch_data nadal nie ma last_forecast, to znaczy że wystąpił błąd
-        # st.rerun() wywoła się tylko jeśli status nie jest błędem
-        if st.session_state.get('update_status') == "success":
+        if st.button("URUCHOM TERAZ"):
+            fetch_data()
             st.rerun()
+
