@@ -98,7 +98,7 @@ if st.session_state['last_forecast']:
         </style>
     """, unsafe_allow_html=True)
 
-    st.title("⚒️ Pogoda u Barda")
+    st.title("⚒️ Pogoda u Kamila")
 
     # --- SEKCJA GÓRNA: AKTUALNA TEMP (Z API) ---
     st.markdown(f"""
@@ -134,3 +134,4 @@ if st.session_state['last_forecast']:
 else:
     fetch_data()
     st.rerun()
+
