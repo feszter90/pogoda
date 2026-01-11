@@ -11,11 +11,11 @@ st.set_page_config(page_title="Śląski Bard: Pogoda AI", page_icon="⚒️", la
 
 def get_weather_theme(text):
     text = text.lower()
-    if any(word in text for word in ["deszcz", "loć", "opady"]):
+    if any(word in text for word in ["deszcz", "loć", "opady", "deszczowo"]):
         return "linear-gradient(180deg, #1e3c72 0%, #2a5298 100%)", "🌧️", "white"
-    if any(word in text for word in ["śnieg", "mróz", "pizgo"]):
+    if any(word in text for word in ["śnieg", "mróz", "pizgo", "zimno"]):
         return "linear-gradient(180deg, #83a4d4 0%, #b6fbff 100%)", "❄️", "#1e3c72"
-    if any(word in text for word in ["słońce", "słoneczn", "pogodn", "hic"]):
+    if any(word in text for word in ["słońce", "słoneczn", "pogodn", "ciepło"]):
         return "linear-gradient(180deg, #f8b500 0%, #fceabb 100%)", "☀️", "#212121"
     return "linear-gradient(180deg, #0f2027 0%, #2c5364 100%)", "🌤️", "white"
 
@@ -26,20 +26,22 @@ def fetch_data():
         res = requests.get("https://pogodadlaslaska.pl/", timeout=15)
         res.raise_for_status()
         soup = BeautifulSoup(res.text, 'html.parser')
-        tekst_strony = soup.get_text(separator=' ', strip=True)[:10000]
+        tekst_strony = soup.get_text(separator=' ', strip=True)[:15000]
 
         client = genai.Client(api_key=api_key)
         
+        # PROMPT: Śląski Bard Przystępny
         prompt = (
-            f"Jesteś Śląskim Bardem. Zanalizuj dane i odpowiedz PO ŚLĄSKU.\n"
-            f"Pisz tak, żeby gorole też zrozumieli.\n"
-            f"DANE: \n{tekst_strony}\n\n"
-            f"FORMAT ODPOWIEDZI (DOKŁADNIE TAKI):\n"
-            f"TEMP: [sama liczba stopni]\n"
-            f"INFO: [wiatr km/h], [jakość powietrza]\n"
-            f"RADA: [błyskotliwa rada po śląsku]\n"
-            f"PROGNOZA:\n"
-            f"[Ikona] [Pora]| [Temperatura]| [Opis po śląsku]"
+            f"Analizuj dane pogodowe: \n{tekst_strony}\n\n"
+            f"Jesteś Śląskim Bardem. Mówisz z charakterystycznym śląskim akcentem i używasz śląskich zwrotów, "
+            f"ale robisz to tak, żeby każdy Polak Cię zrozumiał (używaj zrozumiałej gwary). \n"
+            f"Odpowiedz DOKŁADNIE według tego wzoru:\n"
+            f"TEMP_TERAZ: [sama liczba]\n"
+            f"WIATR: [liczba]\n"
+            f"LUFT: [ocena]\n"
+            f"RADA: [krótka rada z lekkim śląskim zacięciem]\n"
+            f"PROGNOZA_LISTA:\n"
+            f"[Ikona] [Pora]| [Temperatura]| [Opis po śląsku, ale zrozumiały]"
         )
         
         response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
@@ -50,7 +52,7 @@ def fetch_data():
         st.session_state['update_status'] = "error"
         st.error(f"Feler: {e}")
 
-# --- 3. LOGIKA WYŚWIETLANIA ---
+# --- 3. LOGIKA APLIKACJI ---
 if 'last_forecast' not in st.session_state:
     st.session_state['last_forecast'] = None
 
@@ -59,61 +61,73 @@ st_autorefresh(interval=3600000, key="weather_refresh")
 if st.session_state['last_forecast']:
     raw_text = st.session_state['last_forecast']
     
-    # Ekstrakcja danych za pomocą wyrażeń regularnych (odporna na puste linie)
-    temp_search = re.search(r"TEMP:\s*([\d+-]+)", raw_text)
-    info_search = re.search(r"INFO:\s*(.*)", raw_text)
-    rada_search = re.search(r"RADA:\s*(.*)", raw_text)
+    # Wyciąganie danych (regex)
+    temp_match = re.search(r"TEMP_TERAZ:\s*([\d+-]+)", raw_text)
+    wiatr_match = re.search(r"WIATR:\s*([\d+-]+)", raw_text)
+    luft_match = re.search(r"LUFT:\s*(.*)", raw_text)
+    rada_match = re.search(r"RADA:\s*(.*)", raw_text)
     
-    clean_temp = temp_search.group(1) if temp_search else "??"
-    info_text = info_search.group(1) if info_search else "Brak danych"
-    advice = rada_search.group(1) if rada_search else "Bard mo dzisiej wolne..."
+    clean_temp = temp_match.group(1) if temp_match else "??"
+    clean_wiatr = wiatr_match.group(1) if wiatr_match else "--"
+    clean_luft = luft_match.group(1).split('\n')[0] if luft_match else "Nie wiadomo"
+    advice = rada_match.group(1).split('\n')[0] if rada_match else "Miejcie się dobrze!"
 
-    # Wycinanie części prognozy (wszystko po słowie PROGNOZA:)
-    forecast_part = raw_text.split("PROGNOZA:")[-1].strip()
-    forecast_lines = [line for line in forecast_part.split('\n') if "|" in line]
+    # Przetwarzanie listy
+    forecast_lines = []
+    if "PROGNOZA_LISTA:" in raw_text:
+        list_part = raw_text.split("PROGNOZA_LISTA:")[-1].strip()
+        forecast_lines = [l.strip() for l in list_part.split('\n') if "|" in l]
 
     bg_color, main_icon, font_color = get_weather_theme(raw_text)
 
+    # STYLE
     st.markdown(f"""
         <style>
         .stApp {{ background: {bg_color}; background-attachment: fixed; }}
-        h1, h2, h3, p, span, div {{ color: {font_color} !important; font-family: 'Arial'; }}
-        .main-card {{ background: rgba(0,0,0,0.1); padding: 20px; border-radius: 25px; text-align: center; border: 1px solid rgba(255,255,255,0.1); }}
-        .advice-card {{ background: rgba(0, 255, 127, 0.2); padding: 15px; border-radius: 15px; border-left: 5px solid #008f4f; margin: 20px 0; font-style: italic; }}
-        .forecast-card {{ background: rgba(255, 255, 255, 0.2); padding: 15px; border-radius: 18px; margin-bottom: 10px; backdrop-filter: blur(10px); }}
+        h1, h2, h3, p, span, div {{ color: {font_color} !important; font-family: 'Segoe UI', Tahoma, sans-serif; }}
+        .main-card {{ background: rgba(0,0,0,0.1); padding: 25px; border-radius: 30px; text-align: center; border: 1px solid rgba(255,255,255,0.1); margin-top: -30px; }}
+        .advice-card {{ background: rgba(0, 255, 127, 0.15); padding: 15px; border-radius: 20px; border-left: 6px solid #008f4f; margin: 20px 0; font-size: 1.1em; }}
+        .forecast-card {{ background: rgba(255, 255, 255, 0.18); padding: 15px; border-radius: 20px; margin-bottom: 10px; backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.1); }}
         </style>
     """, unsafe_allow_html=True)
 
     st.title("⚒️ Śląski Bard godo:")
 
+    # Główny widok
     st.markdown(f"""
         <div class="main-card">
-            <div style="font-size: 80px;">{main_icon}</div>
-            <div style="font-size: 70px; font-weight: bold;">{clean_temp}°C</div>
-            <div style="font-size: 18px; opacity: 0.9;">{info_text}</div>
+            <div style="font-size: 85px; margin-bottom: 10px;">{main_icon}</div>
+            <div style="font-size: 90px; font-weight: 900; line-height: 0.8; margin-bottom: 20px;">{clean_temp}°</div>
+            <div style="font-size: 18px; font-weight: 500; opacity: 0.9;">
+                💨 Wiatr: {clean_wiatr} km/h | 🌫️ Luft: {clean_luft}
+            </div>
         </div>
     """, unsafe_allow_html=True)
 
     st.markdown(f"<div class='advice-card'>💡 {advice}</div>", unsafe_allow_html=True)
 
-    for line in forecast_lines:
-        parts = line.split('|')
-        if len(parts) == 3:
-            st.markdown(f"""
-                <div class="forecast-card">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <b>{parts[0].strip()}</b>
-                        <span style="background: rgba(0,0,0,0.1); padding: 3px 10px; border-radius: 10px; font-weight: bold;">{parts[1].strip()}</span>
+    if forecast_lines:
+        st.markdown("### 🗓️ Co nos czeko:")
+        for line in forecast_lines:
+            parts = line.split('|')
+            if len(parts) >= 3:
+                st.markdown(f"""
+                    <div class="forecast-card">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-size: 1.1em; font-weight: bold;">{parts[0].strip()}</span>
+                            <span style="background: rgba(0,0,0,0.1); padding: 4px 15px; border-radius: 12px; font-weight: 900; font-size: 1.1em;">{parts[1].strip()}</span>
+                        </div>
+                        <div style="margin-top: 8px; font-size: 1em; line-height: 1.4;">{parts[2].strip()}</div>
                     </div>
-                    <div style="margin-top: 5px; font-size: 0.9em;">{parts[2].strip()}</div>
-                </div>
-            """, unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
 
-    if st.button("Odśwież dane"):
+    if st.button("Odśwież pogodę"):
         fetch_data()
         st.rerun()
+
+    st.caption(f"Aktualizacja: {st.session_state.get('last_update', '---')}")
+
 else:
-    st.info("Pobieranie danych...")
+    st.info("Bard szuka mądrego słowa o pogodzie...")
     fetch_data()
     st.rerun()
-
