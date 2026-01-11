@@ -42,7 +42,6 @@ def fetch_data():
         
         prompt = (
             f"Analizuj dane pogodowe: \n{tekst_strony}\n\n"
-            f"Jesteś Śląskim Bardem w aplikacji Kamila. Mówisz zrozumiale po polsku z lekkim akcentem.\n"
             f"Aktualna temperatura to {precise_now}°C.\n"
             f"Przygotuj prognozę w dwóch częściach:\n"
             f"1. SZCZEGÓŁY NA DZIŚ: rano, południe, wieczór, noc.\n"
@@ -159,3 +158,4 @@ if st.session_state['last_forecast']:
 else:
     fetch_data()
     st.rerun()
+
