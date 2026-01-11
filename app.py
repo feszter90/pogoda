@@ -64,14 +64,16 @@ if 'update_status' not in st.session_state:
 # Auto-odświeżanie co 1h
 st_autorefresh(interval=3600000, key="weather_refresh")
 
-# --- INTERFEJS ---
+# --- INTERFEJS UŻYTKOWNIKA ---
 if st.session_state['last_forecast']:
     try:
+        # Parsowanie danych zapisanych w sesji
         lines = st.session_state['last_forecast'].split('\n')
         data_line = lines[0].split(',')
         raw_temp, wind, air = data_line[0], data_line[1], data_line[2]
         advice, main_text = lines[1], "\n".join(lines[2:])
         
+        # Wyciąganie samej liczby temperatury
         clean_temp = "".join(re.findall(r"[-+]?\d+", raw_temp))
         bg_color, main_icon = get_weather_theme(main_text)
 
@@ -80,16 +82,15 @@ if st.session_state['last_forecast']:
             <style>
             .stApp {{ background: {bg_color}; background-attachment: fixed; color: white !important; }}
             .card {{ background: rgba(255, 255, 255, 0.15); padding: 20px; border-radius: 20px; backdrop-filter: blur(15px); border: 1px solid rgba(255, 255, 255, 0.2); margin-top: 15px; }}
-            .advice-card {{ background: rgba(0, 255, 127, 0.2); padding: 15px; border-left: 5px solid #00ff7f; border-radius: 10px; margin: 10px 0; }}
+            .advice-card {{ background: rgba(0, 255, 127, 0.25); padding: 15px; border-left: 5px solid #00ff7f; border-radius: 12px; margin: 10px 0; }}
             h1, h2, h3, p, span {{ color: white !important; }}
             </style>
         """, unsafe_allow_html=True)
 
         st.title("🌤️ Śląsk AI Dashboard")
         
-        # Jeśli ostatnia próba była błędem (np. 429), pokaż dyskretne info
         if st.session_state.get('update_status') == "error":
-            st.info("⚠️ Aktualizacja w toku (serwer zajęty). Widzisz dane z godziny: " + st.session_state.get('last_update', '---'))
+            st.warning("⚠️ Serwer Gemini jest zajęty (Błąd 429). Widzisz ostatnie znane dane.")
 
         col1, col2 = st.columns([1, 1])
         with col1:
@@ -99,11 +100,10 @@ if st.session_state['last_forecast']:
                     <span style="font-size: 60px; font-weight: bold; margin-left: 10px;">{clean_temp}°</span>
                 </div>
             """, unsafe_allow_html=True)
-        
         with col2:
             st.write(f"💨 Wiatr: **{wind} km/h**")
             st.write(f"🌫️ Powietrze: **{air}**")
-            if st.button("ODŚWIEŻ"):
+            if st.button("ODŚWIEŻ"): 
                 fetch_data()
                 st.rerun()
 
@@ -112,23 +112,25 @@ if st.session_state['last_forecast']:
         st.markdown(f"<div class='card'>{main_text}</div>", unsafe_allow_html=True)
         st.caption(f"Ostatnia udana aktualizacja: {st.session_state.get('last_update', '---')}")
 
-    except:
-        st.error("Wystąpił problem z formatowaniem. Spróbuj odświeżyć.")
+    except Exception as e:
+        st.error("Błąd formatowania danych.")
         if st.button("RESTART"):
             fetch_data()
             st.rerun()
 else:
+    # SEKCJA STARTOWA - Zapobieganie pętli błędu 429
     st.title("🌤️ Śląsk AI")
+    
     if st.session_state.get('update_status') == "error":
-        st.error("Limit zapytań wyczerpany (Błąd 429).")
-        st.info("Google Gemini potrzebuje chwili odpoczynku. Odczekaj minutę i spróbuj ponownie.")
-        if st.button("PONÓW PRÓBĘ"):
+        st.error("Limit zapytań Gemini przekroczony (Błąd 429).")
+        st.write("Google potrzebuje minuty przerwy. Nie odświeżaj strony co sekundę.")
+        if st.button("SPRÓBUJ PONOWNIE"):
             fetch_data()
             st.rerun()
-     else:
-         st.info("Pobieram dane startowe...")
-         fetch_data()
-        # Małe opóźnienie, żeby nie spamować serwera
-         time.sleep(1) 
-          st.rerun()
-
+    else:
+        st.info("Pobieram dane startowe...")
+        fetch_data()
+        # Jeśli po fetch_data nadal nie ma last_forecast, to znaczy że wystąpił błąd
+        # st.rerun() wywoła się tylko jeśli status nie jest błędem
+        if st.session_state.get('update_status') == "success":
+            st.rerun()
