@@ -24,7 +24,7 @@ def get_weather_theme(text):
     return "linear-gradient(180deg, #0f2027 0%, #2c5364 100%)", "🌤️"
 
 def fetch_data():
-    """Pobiera dane ze strony i przetwarza je przez AI"""
+    """Pobiera dane ze strony i przetwarza je przez AI z obsługą błędów"""
     try:
         api_key = st.secrets["GEMINI_API_KEY"]
         res = requests.get("https://pogodadlaslaska.pl/", timeout=15)
@@ -44,11 +44,17 @@ def fetch_data():
             "PODAJ KONKRETNY ZAKRES TEMPERATUR (np. 'od 2°C do 5°C'), unikaj sformułowań typu 'będzie mroźno' bez podania stopni."
         )
         
-        response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
+       response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
+        
+        # Sukces - zapisujemy nowe dane
         st.session_state['last_forecast'] = response.text
         st.session_state['last_update'] = time.strftime("%H:%M:%S")
+        st.session_state['update_error'] = False 
     except Exception as e:
-        st.error(f"Błąd podczas pobierania danych: {e}")
+        # Jeśli wystąpi błąd (np. 429), nie usuwamy starej prognozy!
+        st.session_state['update_error'] = True
+        # Logujemy błąd tylko w konsoli serwera, nie straszymy użytkownika
+        print(f"Błąd aktualizacji: {e}")
 
 # --- INICJALIZACJA SESJI ---
 if 'last_forecast' not in st.session_state:
@@ -78,7 +84,10 @@ if st.session_state['last_forecast']:
         
         # Dobieranie motywu
         bg_color, main_icon = get_weather_theme(main_text)
-
+        
+if st.session_state.get('update_error'):
+    st.warning("⚠️ Trwa kolejkowanie aktualizacji... Wyświetlam dane archiwalne.")
+        
         # Aplikowanie stylów CSS
         st.markdown(f"""
             <style>
@@ -150,6 +159,7 @@ else:
     st.info("Pobieram najnowszą prognozę...")
     fetch_data()
     st.rerun()
+
 
 
 
