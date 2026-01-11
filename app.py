@@ -11,20 +11,20 @@ st.set_page_config(page_title="Pogoda & Air Śląsk AI", page_icon="🌤️", la
 
 # --- FUNKCJE POMOCNICZE ---
 def get_weather_theme(text):
-    """Dobiera kolor tła i ikonę główną na podstawie tekstu prognozy"""
+    """Dobiera kolor tła i ikonę na podstawie treści prognozy"""
     text = text.lower()
-    if "deszcz" in text or "opady" in text:
+    if any(word in text for word in ["deszcz", "opady", "mżawka"]):
         return "linear-gradient(180deg, #1e3c72 0%, #2a5298 100%)", "🌧️"
     if "śnieg" in text:
         return "linear-gradient(180deg, #83a4d4 0%, #b6fbff 100%)", "❄️"
-    if "słońce" in text or "słoneczn" in text or "pogodn" in text:
+    if any(word in text for word in ["słońce", "słoneczn", "pogodn", "jasno"]):
         return "linear-gradient(180deg, #f8b500 0%, #fceabb 100%)", "☀️"
-    if "pochmurno" in text or "chmury" in text:
+    if any(word in text for word in ["pochmurno", "chmury", "zachmurzenie"]):
         return "linear-gradient(180deg, #373b44 0%, #4286f4 100%)", "☁️"
     return "linear-gradient(180deg, #0f2027 0%, #2c5364 100%)", "🌤️"
 
 def fetch_data():
-    """Pobiera dane ze strony i przetwarza je przez AI z obsługą błędów"""
+    """Próbuje pobrać dane. Jeśli wystąpi błąd (np. 429), zachowuje stare dane."""
     try:
         api_key = st.secrets["GEMINI_API_KEY"]
         res = requests.get("https://pogodadlaslaska.pl/", timeout=15)
@@ -34,7 +34,7 @@ def fetch_data():
 
         client = genai.Client(api_key=api_key)
         prompt = (
-            "Pisz w stylu śląskiego barda"
+           "Pisz w stylu śląskiego barda"
             "Jesteś profesjonalnym pogodynką na Śląsku. Przeanalizuj dane: " + tekst_strony + "\n\n"
             "Zwróć odpowiedź DOKŁADNIE w tym formacie:\n"
             "Linia 1: temperatura,wiatr,jakość_powietrza (same wartości, np: 12,15,Dobra)\n"
@@ -44,90 +44,57 @@ def fetch_data():
             "PODAJ KONKRETNY ZAKRES TEMPERATUR (np. 'od 2°C do 5°C'), unikaj sformułowań typu 'będzie mroźno' bez podania stopni."
         )
         
-       response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
+        response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
         
-        # Sukces - zapisujemy nowe dane
+        # Sukces - aktualizujemy sesję
         st.session_state['last_forecast'] = response.text
         st.session_state['last_update'] = time.strftime("%H:%M:%S")
-        st.session_state['update_error'] = False 
+        st.session_state['update_status'] = "success"
     except Exception as e:
-        # Jeśli wystąpi błąd (np. 429), nie usuwamy starej prognozy!
-        st.session_state['update_error'] = True
-        # Logujemy błąd tylko w konsoli serwera, nie straszymy użytkownika
-        print(f"Błąd aktualizacji: {e}")
+        # Błąd (np. limit API) - nie czyścimy 'last_forecast'
+        st.session_state['update_status'] = "error"
+        print(f"Błąd API: {e}")
 
 # --- INICJALIZACJA SESJI ---
 if 'last_forecast' not in st.session_state:
     st.session_state['last_forecast'] = None
+if 'update_status' not in st.session_state:
+    st.session_state['update_status'] = "idle"
 
-# Automatyczne odświeżanie co 1 godzinę (3600000 ms)
+# Auto-odświeżanie co 1h
 st_autorefresh(interval=3600000, key="weather_refresh")
 
-# --- WYŚWIETLANIE INTERFEJSU ---
+# --- INTERFEJS ---
 if st.session_state['last_forecast']:
     try:
-        raw_text = st.session_state['last_forecast']
-        lines = raw_text.split('\n')
-        
-        # Wyciąganie danych z pierwszej linii
+        lines = st.session_state['last_forecast'].split('\n')
         data_line = lines[0].split(',')
-        raw_temp = data_line[0]
-        wind = data_line[1]
-        air = data_line[2]
+        raw_temp, wind, air = data_line[0], data_line[1], data_line[2]
+        advice, main_text = lines[1], "\n".join(lines[2:])
         
-        # Wyciąganie rady i reszty tekstu
-        advice = lines[1]
-        main_text = "\n".join(lines[2:])
-        
-        # Oczyszczanie temperatury (zostawiamy tylko cyfry)
         clean_temp = "".join(re.findall(r"[-+]?\d+", raw_temp))
-        
-        # Dobieranie motywu
         bg_color, main_icon = get_weather_theme(main_text)
-        
-if st.session_state.get('update_error'):
-    st.warning("⚠️ Trwa kolejkowanie aktualizacji... Wyświetlam dane archiwalne.")
-        
-        # Aplikowanie stylów CSS
+
+        # Style CSS
         st.markdown(f"""
             <style>
-            .stApp {{
-                background: {bg_color};
-                background-attachment: fixed;
-                color: white !important;
-            }}
-            .card {{
-                background: rgba(255, 255, 255, 0.15);
-                padding: 20px;
-                border-radius: 20px;
-                backdrop-filter: blur(15px);
-                border: 1px solid rgba(255, 255, 255, 0.2);
-                color: white;
-                margin-top: 20px;
-            }}
-            .advice-card {{
-                background: rgba(0, 255, 127, 0.25);
-                padding: 15px;
-                border-left: 5px solid #00ff7f;
-                border-radius: 12px;
-                color: white;
-                font-weight: 500;
-                margin: 15px 0;
-            }}
-            h1, h2, h3, p, span, div {{
-                color: white !important;
-            }}
+            .stApp {{ background: {bg_color}; background-attachment: fixed; color: white !important; }}
+            .card {{ background: rgba(255, 255, 255, 0.15); padding: 20px; border-radius: 20px; backdrop-filter: blur(15px); border: 1px solid rgba(255, 255, 255, 0.2); margin-top: 15px; }}
+            .advice-card {{ background: rgba(0, 255, 127, 0.2); padding: 15px; border-left: 5px solid #00ff7f; border-radius: 10px; margin: 10px 0; }}
+            h1, h2, h3, p, span {{ color: white !important; }}
             </style>
         """, unsafe_allow_html=True)
 
-        # NAGŁÓWEK
-        st.title("🌤️ Pogoda dla Śląska")
+        st.title("🌤️ Śląsk AI Dashboard")
         
+        # Jeśli ostatnia próba była błędem (np. 429), pokaż dyskretne info
+        if st.session_state.get('update_status') == "error":
+            st.info("⚠️ Aktualizacja w toku (serwer zajęty). Widzisz dane z godziny: " + st.session_state.get('last_update', '---'))
+
         col1, col2 = st.columns([1, 1])
         with col1:
-            # Ikona i Temp obok siebie
             st.markdown(f"""
-                <div style="display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.1); border-radius: 20px; padding: 10px;">
+                <div style="display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.15); border-radius: 20px; padding: 10px;">
                     <span style="font-size: 70px;">{main_icon}</span>
                     <span style="font-size: 60px; font-weight: bold; margin-left: 10px;">{clean_temp}°</span>
                 </div>
@@ -136,30 +103,22 @@ if st.session_state.get('update_error'):
         with col2:
             st.write(f"💨 Wiatr: **{wind} km/h**")
             st.write(f"🌫️ Powietrze: **{air}**")
-            if st.button("ODŚWIEŻ TERAZ"):
+            if st.button("ODŚWIEŻ"):
                 fetch_data()
                 st.rerun()
 
-        # RADA DNIA
         st.markdown(f"<div class='advice-card'>💡 {advice}</div>", unsafe_allow_html=True)
-        
-        # PROGNOZA SZCZEGÓŁOWA
         st.markdown("### 📝 Prognoza szczegółowa")
         st.markdown(f"<div class='card'>{main_text}</div>", unsafe_allow_html=True)
-        
-        st.caption(f"Ostatnia aktualizacja: {st.session_state.get('last_update', '---')}")
+        st.caption(f"Ostatnia udana aktualizacja: {st.session_state.get('last_update', '---')}")
 
-    except Exception as e:
-        st.error("Błąd parsowania danych przez AI. Spróbuj odświeżyć.")
+    except:
+        st.error("Wystąpił problem z formatowaniem. Spróbuj odświeżyć.")
         if st.button("RESTART"):
             fetch_data()
             st.rerun()
 else:
-    st.title("🌤️ Witaj w Śląsk AI")
-    st.info("Pobieram najnowszą prognozę...")
+    st.title("🌤️ Śląsk AI")
+    st.info("Pobieram dane startowe...")
     fetch_data()
     st.rerun()
-
-
-
-
